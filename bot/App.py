@@ -16,7 +16,7 @@ with open('config.json', 'r') as file:
     config = json.load(file)
 
 # Bot token can be obtained via https://t.me/BotFather
-TOKEN = "7085756019:AAGNIyTreXapTCJMpTM_1VCjaYGcQsZ_QGU"
+TOKEN = ""
 
 # All handlers should be attached to the Router (or Dispatcher)
 
