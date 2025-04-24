@@ -15,19 +15,17 @@ import requests
 with open('config.json', 'r') as file:
     config = json.load(file)
 
-# Bot token can be obtained via https://t.me/BotFather
-TOKEN = ""
+with open('../secrets.json', 'r') as file:
+  secrets = json.load(file)
 
-# All handlers should be attached to the Router (or Dispatcher)
+TOKEN = secrets['bot']
 
 dp = Dispatcher()
-
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
 
     await message.answer(f"Привет, {html.bold(message.from_user.full_name)}!")
-
 
 @dp.message()
 async def stats(message: Message) -> None:
@@ -40,17 +38,12 @@ async def stats(message: Message) -> None:
         
         await message.answer(f"Открытие: {r["open"]}, Закрытие: {r["close"]}, Процент разницы: {r["percent"]}, Тренд: {'Положительный' if r["trend"] else 'Отрицательный'}")
     except TypeError:
-        # But not all the types is supported to be copied so need to handle it
         await message.answer("Nice try!")
 
-
 async def main() -> None:
-    # Initialize Bot instance with default bot properties which will be passed to all API calls
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-    # And the run events dispatching
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
