@@ -6,6 +6,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+from flask import Flask, jsonify
+from flask import request
+
+app = Flask(__name__)
 
 class LSTMModel(nn.Module):
     def __init__(self, input_size=1, hidden_size=128, output_size=1, num_layers=3):
@@ -60,34 +64,23 @@ def predict_future(model, scaler, last_sequence, future_steps=12):
     
     return predictions.flatten()
 
+@app.route("/")
+def hello_world():
+    return 'hello'
 
-input_data = np.array([306.25, 310.11, 308.14, 309.85, 309.9, 309.74, 309.51, 310.59, 
-                      311.79, 312.3, 311.62, 310.56, 310.6, 312.0, 310.77, 311.27, 
-                      311.29, 311.38, 312.6, 314.4, 312.77, 312.4, 311.7, 316.9, 
-                      310.45, 310.32, 310.63])
+@app.route("/getPrediction", methods=["GET", "POST"])
+def prediction():
 
-# 1. Преобразуем данные в 2D формат и нормализуем
-input_data_2d = input_data.reshape(-1, 1)  # преобразуем в (n_samples, n_features)
-input_scaled = scaler.transform(input_data_2d)  # используем загруженный scaler
+    data = request.get_json()
 
-# 2. Берем последние 24 значения (как ожидает модель)
-last_sequence = input_scaled[-24:].reshape(24, 1)  # последовательность из 24 часов
+    input_data = np.array(data['tradeData'])
 
-# 3. Делаем прогноз на 12 часов вперед
-future_steps = 12
-predictions = predict_future(model, scaler, last_sequence, future_steps)
+    input_data_2d = input_data.reshape(-1, 1)
+    input_scaled = scaler.transform(input_data_2d) 
 
-print("Прогнозируемые значения:")
-for i, price in enumerate(predictions, 1):
-    print(f"Час {i}: {price:.2f}")
+    last_sequence = input_scaled[-24:].reshape(24, 1)
 
-# 4. Визуализация
-plt.figure(figsize=(12, 6))
-plt.plot(input_data, 'b-', label='Исторические данные')
-plt.plot(range(len(input_data), len(input_data)+future_steps), predictions, 'r-', label='Прогноз')
-plt.title('Прогноз цены на следующие 12 часов')
-plt.xlabel('Время (часы)')
-plt.ylabel('Цена')
-plt.legend()
-plt.grid()
-plt.show()
+    future_steps = 12
+    predictions = predict_future(model, scaler, last_sequence, future_steps)
+
+    return jsonify(predictions.tolist())

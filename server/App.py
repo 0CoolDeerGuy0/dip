@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask import request
 import json
 
@@ -7,6 +7,9 @@ import datetime
 
 with open('../secrets.json', 'r') as file:
   secrets = json.load(file)
+
+with open('config.json', 'r') as file:
+  config = json.load(file)
 
 INVESTTOKEN = secrets["invest"]
 
@@ -54,13 +57,12 @@ def get_money (figi):
     candles = []
 
   result = []
-  print(len(candles))
   for i in candles:
     result.append(float(f'{i['close']['units']}.{i['close']['nano']//10000000}'))
 
-  return result
+  print(result)
 
-print(get_money(get_figi('SBER')))
+  return result
 
 err = {"error": 0}
 
@@ -71,8 +73,26 @@ def hello_world():
 @app.route("/get-stat")
 def stats():
     
+    answ = {"header": '', 'data': []}
+    
     tradeName = request.args.get('name')
 
-    res = json.dumps(err)
+    res = {'tradeData': get_money(get_figi(tradeName))}
+    
+    if len(res['tradeData']) < 24:
+      answ['header'] = 'Недостаточно данных от брокера'
+      return jsonify(answ)
 
-    return res
+    url = f"http://{config['server']['ip']}:{config['server']['port']}/getPrediction"
+    headers = {'Content-type' : 'application/json'}
+
+    r = requests.post(url, headers=headers, data=json.dumps(res))
+
+    if r.status_code == 500:
+      answ['header'] = 'Произошла ошибка в работе модели'
+      return jsonify(answ)
+
+    answ['data'] = r.json()
+    answ['header'] = 'Успешно'
+
+    return jsonify(answ)
