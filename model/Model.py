@@ -17,7 +17,6 @@ class LSTMModel(nn.Module):
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=0.2)
         self.fc = nn.Linear(hidden_size, output_size)
         
-        # Инициализация весов
         for name, param in self.lstm.named_parameters():
             if 'weight' in name:
                 nn.init.xavier_normal_(param)
@@ -33,7 +32,7 @@ model.eval()
 
 scaler = joblib.load('scaler49.save')
 
-def predict_future(model, scaler, last_sequence, future_steps=12):
+def predict(model, scaler, last_sequence, future_steps=12):
     """
     Прогнозирует future_steps значений вперёд
     
@@ -47,19 +46,15 @@ def predict_future(model, scaler, last_sequence, future_steps=12):
     current_sequence = last_sequence.copy()
     
     for _ in range(future_steps):
-        # Преобразуем в тензор и добавляем размерность batch
         input_tensor = torch.FloatTensor(current_sequence).unsqueeze(0)
         
-        # Делаем прогноз
         with torch.no_grad():
             predicted = model(input_tensor).numpy()[0]
         
         predictions.append(predicted[0])
         
-        # Обновляем последовательность: удаляем первый элемент и добавляем прогноз
         current_sequence = np.vstack([current_sequence[1:], predicted])
     
-    # Обратное преобразование масштаба
     predictions = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
     
     return predictions.flatten()
@@ -73,6 +68,12 @@ def prediction():
 
     data = request.get_json()
 
+    y = np.array(data['tradeData'])
+    window = 3
+    smoothed = np.convolve(y, np.ones(window)/window, mode='valid')
+    diff_smoothed = np.diff(smoothed)
+    trend_direction = "+" if np.mean(diff_smoothed) > 0 else "-" if np.mean(diff_smoothed) < 0 else "0"
+
     input_data = np.array(data['tradeData'])
 
     input_data_2d = input_data.reshape(-1, 1)
@@ -81,6 +82,8 @@ def prediction():
     last_sequence = input_scaled[-24:].reshape(24, 1)
 
     future_steps = 12
-    predictions = predict_future(model, scaler, last_sequence, future_steps)
+    predictions = predict(model, scaler, last_sequence, future_steps)
 
-    return jsonify(predictions.tolist())
+    r = {'trend': trend_direction, 'predictionData': predictions.tolist()}
+
+    return jsonify(r)

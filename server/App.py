@@ -20,7 +20,7 @@ def filter_by_class_code(instruments, class_code="TQBR"):
 
 def get_figi(query):
   url = "https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/FindInstrument"
-  payload = {"query": query}  # Или "AAPL" для Apple
+  payload = {"query": query}  
 
   headers = {
     "Authorization": f"Bearer {INVESTTOKEN}",
@@ -28,7 +28,11 @@ def get_figi(query):
   }
 
   response = requests.post(url, headers=headers, json=payload).json()
-  return filter_by_class_code(response['instruments'])
+
+  if hasattr(response, 'instruments'):
+    return filter_by_class_code(response['instruments'])
+  else:
+    return 'none'
 
 def get_money (figi):
   url = "https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetCandles"
@@ -77,7 +81,13 @@ def stats():
     
     tradeName = request.args.get('name')
 
-    res = {'tradeData': get_money(get_figi(tradeName))}
+    figi = get_figi(tradeName)
+
+    if figi == 'none':
+      answ['header'] = 'Неправильное имя актива'
+      return jsonify(answ)
+
+    res = {'tradeData': get_money(figi)}
     
     if len(res['tradeData']) < 24:
       answ['header'] = 'Недостаточно данных от брокера'
@@ -93,6 +103,30 @@ def stats():
       return jsonify(answ)
 
     answ['data'] = r.json()
+    answ['header'] = 'Успешно'
+
+    return jsonify(answ)
+
+@app.route("/get-stat-small")
+def stats():
+    
+    answ = {"header": '', 'data': []}
+    
+    tradeName = request.args.get('name')
+
+    figi = get_figi(tradeName)
+
+    if figi == 'none':
+      answ['header'] = 'Неправильное имя актива'
+      return jsonify(answ)
+
+    res = {'tradeData': get_money(figi)}
+    
+    if len(res['tradeData']) < 24:
+      answ['header'] = 'Недостаточно данных от брокера'
+      return jsonify(answ)
+
+    answ['data'] = res.json()
     answ['header'] = 'Успешно'
 
     return jsonify(answ)
